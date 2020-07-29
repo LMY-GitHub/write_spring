@@ -13,5 +13,5 @@ public interface BoyBeanFactory {
      */
     Object getBean(String beanName) throws Exception;
 
-    public Object getBean(Class<?> beanClass) throws Exception;
+    Object getBean(Class<?> beanClass) throws Exception;
 }

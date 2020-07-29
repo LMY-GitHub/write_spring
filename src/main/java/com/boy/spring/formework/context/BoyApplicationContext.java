@@ -2,12 +2,14 @@ package com.boy.spring.formework.context;
 
 import com.boy.spring.formework.beans.BoyBeanWrapper;
 import com.boy.spring.formework.beans.config.BoyBeanDefinition;
+import com.boy.spring.formework.beans.config.BoyBeanPostProcessor;
 import com.boy.spring.formework.context.support.BoyBeanDefinitionReader;
 import com.boy.spring.formework.context.support.BoyDefaultListableBeanFactory;
 import com.boy.spring.formework.core.BoyBeanFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BoyApplicationContext extends BoyDefaultListableBeanFactory implements BoyBeanFactory {
@@ -19,7 +21,7 @@ public class BoyApplicationContext extends BoyDefaultListableBeanFactory impleme
     private Map<String, Object> factoryBeanObjectCache = new ConcurrentHashMap<String, Object>();
 
     //  通用的 IOC 容器
-    private Map<String, BoyBeanWrapper> factoryBeanInstance = new ConcurrentHashMap<String, BoyBeanWrapper>();
+    private Map<String, BoyBeanWrapper> factoryBeanInstanceCache = new ConcurrentHashMap<String, BoyBeanWrapper>();
 
     public BoyApplicationContext(String... configLocations) {
         this.configLocations = configLocations;
@@ -45,11 +47,74 @@ public class BoyApplicationContext extends BoyDefaultListableBeanFactory impleme
         doAutowrited();
     }
 
+    //  只处理不是延时加载的情况
+    private void doAutowrited() {
+        for (Map.Entry<String, BoyBeanDefinition> beanDefinitionEntry : super.beanDefinitionMap.entrySet()) {
+            String beanName = beanDefinitionEntry.getKey();
+            if (!beanDefinitionEntry.getValue().isLazyInit()) {
+                try {
+                    getBean(beanName);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void doRegisterBeanDefinition(List<BoyBeanDefinition> beanDefinitions) throws Exception {
+        for (BoyBeanDefinition beanDefinition : beanDefinitions) {
+            if (super.beanDefinitionMap.containsKey(beanDefinition.getFactoryBeanName())) {
+                throw new Exception("The " + beanDefinition.getFactoryBeanName() + " is exists!");
+            }
+            super.beanDefinitionMap.put(beanDefinition.getFactoryBeanName(), beanDefinition);
+        }
+    }
+
     public Object getBean(String beanName) throws Exception {
+        BoyBeanDefinition beanDefinition = super.beanDefinitionMap.get(beanName);
+        try {
+            //  生成通知事件
+            BoyBeanPostProcessor beanPostProcessor = new BoyBeanPostProcessor();
+            Object instance = instantiateBean(beanDefinition);
+            if (null == instance) {
+                return null;
+            }
+            //  在实例化之前调用一次
+            beanPostProcessor.postProcessBeforeInitialization(instance, beanName);
+            BoyBeanWrapper beanWrapper = new BoyBeanWrapper(instance);
+            this.factoryBeanInstanceCache.put(beanName, beanWrapper);
+            //  在实例化之后调用一次
+            beanPostProcessor.postProcessAfterInitialization(instance, beanName);
+            populateBean(beanName, instance);
+            //  通过这样的调用，相当于给了自己留有了可操作的空间
+            return this.factoryBeanInstanceCache.get(beanName).getWrappedClass();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private void populateBean(String beanName, Object instance) {
+
+    }
+
+    private Object instantiateBean(BoyBeanDefinition beanDefinition) {
         return null;
     }
 
     public Object getBean(Class<?> beanClass) throws Exception {
-        return null;
+        return getBean(beanClass.getName());
+    }
+
+    public String[] getBeanDefinitionNames() {
+        return this.beanDefinitionMap.keySet().toArray(new String[this.beanDefinitionMap.size()]);
+    }
+
+    public int getBeanDefinitionCount() {
+        return this.beanDefinitionMap.size();
+    }
+
+    public Properties getConfig() {
+        return this.reader.getConfig();
     }
 }
