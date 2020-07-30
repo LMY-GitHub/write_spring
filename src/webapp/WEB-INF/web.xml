@@ -14,7 +14,7 @@
 
     <servlet>
         <servlet-name>boymvc</servlet-name>
-        <servlet-class>com.boy.spring.formework.webmvc.serlvlet.BoyIsPatcherServlet</servlet-class>
+        <servlet-class>com.boy.spring.formework.webmvc.servlet.BoyIsPatcherServlet</servlet-class>
         <init-param>
             <param-name>contextConfigLocation</param-name>
             <param-value>classpath*:application.properties</param-value>

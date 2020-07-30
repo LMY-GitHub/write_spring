@@ -1,4 +1,4 @@
-package com.boy.spring.formework.webmvc.serlvlet;
+package com.boy.spring.formework.webmvc.servlet;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;

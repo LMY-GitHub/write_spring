@@ -1,5 +1,8 @@
 package com.boy.spring.formework.context;
 
+import com.boy.annotation.BoyAutowired;
+import com.boy.annotation.BoyController;
+import com.boy.annotation.BoyService;
 import com.boy.spring.formework.beans.BoyBeanWrapper;
 import com.boy.spring.formework.beans.config.BoyBeanDefinition;
 import com.boy.spring.formework.beans.config.BoyBeanPostProcessor;
@@ -7,6 +10,7 @@ import com.boy.spring.formework.context.support.BoyBeanDefinitionReader;
 import com.boy.spring.formework.context.support.BoyDefaultListableBeanFactory;
 import com.boy.spring.formework.core.BoyBeanFactory;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -95,10 +99,45 @@ public class BoyApplicationContext extends BoyDefaultListableBeanFactory impleme
     }
 
     private void populateBean(String beanName, Object instance) {
-
+        Class<?> clazz = instance.getClass();
+        if (!(clazz.isAnnotationPresent(BoyController.class) || clazz.isAnnotationPresent(BoyService.class))){
+            return;
+        }
+        Field[] fields = clazz.getDeclaredFields();
+        for (Field field : fields) {
+            if (!field.isAnnotationPresent(BoyAutowired.class)){
+                continue;
+            }
+            BoyAutowired autowired  = field.getAnnotation(BoyAutowired.class);
+            String autowiredBeanName = autowired.value().trim();
+            if ("".equals(autowiredBeanName)){
+                autowiredBeanName = field.getType().getName();
+            }
+            field.setAccessible(true);
+            try {
+                    field.set(instance,this.factoryBeanInstanceCache.get(autowiredBeanName).getWrappedClass());
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
     }
 
+    //  传入 BeanDefinition ，就返回一个实例
     private Object instantiateBean(BoyBeanDefinition beanDefinition) {
+        Object instance = null;
+        String className = beanDefinition.getBeanClassName();
+        try {
+            if (this.factoryBeanObjectCache.containsKey(className)){
+                instance = this.factoryBeanObjectCache.get(className);
+            }else {
+                Class<?> clazz = Class.forName(className);
+                instance = clazz.newInstance();
+                this.factoryBeanObjectCache.put(beanDefinition.getFactoryBeanName(),instance);
+            }
+            return instance;
+        }catch (Exception e){
+            e.printStackTrace();
+        }
         return null;
     }
 
