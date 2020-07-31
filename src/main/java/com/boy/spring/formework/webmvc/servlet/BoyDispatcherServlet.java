@@ -1,14 +1,13 @@
 package com.boy.spring.formework.webmvc.servlet;
 
-import com.boy.annotation.BoyController;
-import com.boy.annotation.BoyRequestMapping;
+import com.boy.spring.formework.annotation.BoyController;
+import com.boy.spring.formework.annotation.BoyRequestMapping;
 import com.boy.spring.formework.context.BoyApplicationContext;
 import com.boy.spring.formework.webmvc.BoyHandlerAdapter;
 import com.boy.spring.formework.webmvc.BoyHandlerMapping;
 import com.boy.spring.formework.webmvc.BoyModelAndView;
 import com.boy.spring.formework.webmvc.BoyView;
 import com.boy.spring.formework.webmvc.BoyViewResolver;
-import lombok.extern.slf4j.Slf4j;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -25,7 +24,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Slf4j
 public class BoyDispatcherServlet extends HttpServlet {
     private final String LOCATION = "contextConfigLocation";
 
@@ -176,7 +174,7 @@ public class BoyDispatcherServlet extends HttpServlet {
         }
     }
 
-    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) {
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         //  根据用户请求的url来获得一个Handler
         BoyHandlerMapping handler = getHandler(req);
         if (handler == null) {
@@ -205,7 +203,7 @@ public class BoyDispatcherServlet extends HttpServlet {
         return null;
     }
 
-    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, BoyModelAndView modelAndView) {
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, BoyModelAndView modelAndView) throws Exception {
 
         // 调用 viewResolver 的 resolveViewName() 方法
         if (null == modelAndView) {
@@ -216,9 +214,9 @@ public class BoyDispatcherServlet extends HttpServlet {
             return;
         }
 
-        if (this.viewResolvers != null){
+        if (this.viewResolvers != null) {
             for (BoyViewResolver viewResolver : this.viewResolvers) {
-                BoyView view = viewResolver.resolveViewName(modelAndView.getViewName, null);
+                BoyView view = viewResolver.resolveViewName(modelAndView.getViewName(), null);
                 if (view != null) {
                     view.render(modelAndView.getModel(), req, resp);
                     return;

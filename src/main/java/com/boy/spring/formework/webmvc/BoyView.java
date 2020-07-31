@@ -1,10 +1,72 @@
 package com.boy.spring.formework.webmvc;
 
+import com.sun.org.apache.xerces.internal.impl.xpath.regex.Match;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.RandomAccessFile;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class BoyView {
-    public void render(Object model, HttpServletRequest req, HttpServletResponse resp) {
+    public static final String DEFAULT_CONTENT_TYPE = "text/html;charset=utf-8";
 
+    private File viewFile;
+
+    public BoyView(File viewFile) {
+        this.viewFile = viewFile;
+    }
+
+    public static String getDefaultContentType() {
+        return DEFAULT_CONTENT_TYPE;
+    }
+
+    public void render(Map<String, ?> model, HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        StringBuffer sb = new StringBuffer();
+
+        //  对文件只读
+        RandomAccessFile ra = new RandomAccessFile(this.viewFile, "r");
+
+        try {
+            String line = null;
+            //  判断下一行内容是否为空
+            while (null != (line = ra.readLine())) {
+                line = new String(line.getBytes("ISO-8859-1"), "utf-8");
+                Pattern pattern = Pattern.compile("￥\\{[^\\}]+\\}", Pattern.CASE_INSENSITIVE);
+                Matcher matcher = pattern.matcher(line);
+
+                while (matcher.find()) {
+                    String paramName = matcher.group();
+                    paramName = paramName.replaceAll("￥\\{[^\\}]+\\}", "");
+                    Object paramValue = model.get(paramName);
+                    if (null == paramValue) {
+                        continue;
+                    }
+                    line = matcher.replaceFirst(makeStringForRegExp(paramValue.toString()));
+                    matcher = pattern.matcher(line);
+                }
+                sb.append(line);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            ra.close();
+        }
+
+        resp.setCharacterEncoding("utf-8");
+        resp.getWriter().write(sb.toString());
+    }
+
+    private static String makeStringForRegExp(String str) {
+        return str.replace("\\", "\\\\").replace("*", "\\*")
+                .replace("+", "\\+").replace("|", "\\|")
+                .replace("{", "\\{").replace("}", "\\}")
+                .replace("(", "\\(").replace(")", "\\)")
+                .replace("^", "\\^").replace("$", "\\$")
+                .replace("[", "\\[").replace("]", "\\]")
+                .replace("?", "\\?").replace(",", "\\,")
+                .replace(".", "\\.").replace("&", "\\&");
     }
 }

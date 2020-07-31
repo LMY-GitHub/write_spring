@@ -1,8 +1,8 @@
 package com.boy.spring.formework.context;
 
-import com.boy.annotation.BoyAutowired;
-import com.boy.annotation.BoyController;
-import com.boy.annotation.BoyService;
+import com.boy.spring.formework.annotation.BoyAutowired;
+import com.boy.spring.formework.annotation.BoyController;
+import com.boy.spring.formework.annotation.BoyService;
 import com.boy.spring.formework.beans.BoyBeanWrapper;
 import com.boy.spring.formework.beans.config.BoyBeanDefinition;
 import com.boy.spring.formework.beans.config.BoyBeanPostProcessor;
