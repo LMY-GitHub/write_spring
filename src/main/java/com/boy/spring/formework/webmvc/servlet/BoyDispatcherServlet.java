@@ -5,19 +5,27 @@ import com.boy.annotation.BoyRequestMapping;
 import com.boy.spring.formework.context.BoyApplicationContext;
 import com.boy.spring.formework.webmvc.BoyHandlerAdapter;
 import com.boy.spring.formework.webmvc.BoyHandlerMapping;
+import com.boy.spring.formework.webmvc.BoyModelAndView;
+import com.boy.spring.formework.webmvc.BoyView;
 import com.boy.spring.formework.webmvc.BoyViewResolver;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@SL
+@Slf4j
 public class BoyDispatcherServlet extends HttpServlet {
     private final String LOCATION = "contextConfigLocation";
 
@@ -77,6 +85,15 @@ public class BoyDispatcherServlet extends HttpServlet {
     }
 
     private void initViewResolvers(BoyApplicationContext context) {
+        // 从页面中输入的 http://localhost/frist.html
+        //  解决页面名称和模板文件关联的问题
+        String templateRoot = context.getConfig().getProperty("templateRoot");
+        String templateRootPath = this.getClass().getClassLoader().getResource(templateRoot).getFile();
+        File templateRootDir = new File(templateRootPath);
+
+        for (File template : templateRootDir.listFiles()) {
+            this.viewResolvers.add(new BoyViewResolver(templateRoot));
+        }
     }
 
     private void initRequestToViewNameTranslator(BoyApplicationContext context) {
@@ -86,6 +103,12 @@ public class BoyDispatcherServlet extends HttpServlet {
     }
 
     private void initHandlerAdapters(BoyApplicationContext context) {
+        // 在初始化阶段，我们能做的就是，将这些参数的名字或者类型按一定的顺序保存下来
+        // 因为后面用反射调用的时候，传的形参是一个数组
+        // 可以通过记录这些参数的位置 index ，逐个从数组中取值， 这样就和参数的顺序无关了
+        for (BoyHandlerMapping handlerMapping : this.handlerMappings) {
+            this.handlerAdapters.put(handlerMapping, new BoyHandlerAdapter());
+        }
     }
 
     /**
@@ -119,8 +142,8 @@ public class BoyDispatcherServlet extends HttpServlet {
                     String regex = ("/" + beanUrl + requestMapping.value().replaceAll("\\*", ".*"))
                             .replaceAll("/+", "/");
                     Pattern pattern = Pattern.compile(regex);
-                    this,handlerMappings.add(new BoyHandlerMapping(pattern,controller,method));
-                    log.info
+                    this.handlerMappings.add(new BoyHandlerMapping(pattern, controller, method));
+                    System.out.println("Mapping: " + regex + " , " + method);
                 }
             }
         } catch (Exception e) {
@@ -138,4 +161,87 @@ public class BoyDispatcherServlet extends HttpServlet {
     private void initMultipartResolver(BoyApplicationContext context) {
     }
 
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        this.doPost(req, resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            doDispatch(req, resp);
+        } catch (Exception e) {
+            System.out.println("500 error");
+            e.printStackTrace();
+        }
+    }
+
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) {
+        //  根据用户请求的url来获得一个Handler
+        BoyHandlerMapping handler = getHandler(req);
+        if (handler == null) {
+            processDispatchResult(req, resp, new BoyModelAndView("404"));
+            return;
+        }
+
+        BoyHandlerAdapter handlerAdapter = getHandlerAdapter(handler);
+
+        //  这一步只是调用方法，得到返回值
+        BoyModelAndView modelAndView = handlerAdapter.handle(req, resp, handler);
+
+        //  这一步是真正的输出
+        processDispatchResult(req, resp, modelAndView);
+    }
+
+    private BoyHandlerAdapter getHandlerAdapter(BoyHandlerMapping handler) {
+        if (this.handlerAdapters.isEmpty()) {
+            return null;
+        }
+
+        BoyHandlerAdapter handlerAdapter = this.handlerAdapters.get(handler);
+        if (handlerAdapter.supports(handler)) {
+            return handlerAdapter;
+        }
+        return null;
+    }
+
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, BoyModelAndView modelAndView) {
+
+        // 调用 viewResolver 的 resolveViewName() 方法
+        if (null == modelAndView) {
+            return;
+        }
+
+        if (this.viewResolvers.isEmpty()) {
+            return;
+        }
+
+        if (this.viewResolvers != null){
+            for (BoyViewResolver viewResolver : this.viewResolvers) {
+                BoyView view = viewResolver.resolveViewName(modelAndView.getViewName, null);
+                if (view != null) {
+                    view.render(modelAndView.getModel(), req, resp);
+                    return;
+                }
+            }
+        }
+    }
+
+    private BoyHandlerMapping getHandler(HttpServletRequest req) {
+        if (this.handlerMappings.isEmpty()) {
+            return null;
+        }
+        String url = req.getRequestURI();
+        String contextPath = req.getContextPath();
+        url.replace(contextPath, "").replaceAll("/+", "/");
+
+        for (BoyHandlerMapping handlerMapping : this.handlerMappings) {
+            Matcher matcher = handlerMapping.getPattern().matcher(url);
+            if (!matcher.matches()) {
+                continue;
+            }
+            return handlerMapping;
+        }
+        return null;
+    }
 }
