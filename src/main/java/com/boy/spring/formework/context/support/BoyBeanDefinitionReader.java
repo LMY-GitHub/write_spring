@@ -38,6 +38,7 @@ public class BoyBeanDefinitionReader {
                 }
             }
         }
+        
         String str = "ï»¿" + SCAN_PACKAGE;
         doScanner(config.getProperty(str));
     }
