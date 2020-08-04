@@ -1,6 +1,8 @@
 package com.boy.spring.formework.aop.support;
 
 import com.boy.spring.formework.aop.BoyAopConfig;
+import com.boy.spring.formework.aop.aspect.BoyAfterReturningAdvice;
+import com.boy.spring.formework.aop.aspect.BoyAfterThrowingAdvice;
 import com.boy.spring.formework.aop.aspect.BoyMethodBeforeAdvice;
 
 import java.lang.reflect.Method;
@@ -100,7 +102,7 @@ public class BoyAdvisedSupport {
                     }
                     //  异常通知
                     if (!(null == config.getAspectAfterThrow() || "".equals(config.getAspectAfterThrow().trim()))) {
-                        BoyAfterThrowingAdvice afterThrowingAdvice = advices.add(new BoyAfterThrowingAdvice(aspectMethods.get(config.getAspectAfterThrow()), aspectClass.newInstance()));
+                        BoyAfterThrowingAdvice afterThrowingAdvice = new BoyAfterThrowingAdvice(aspectMethods.get(config.getAspectAfterThrow()), aspectClass.newInstance());
                         afterThrowingAdvice.setThrowingName(config.getAspectAfterThrowingName());
                         advices.add(afterThrowingAdvice);
                     }

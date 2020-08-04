@@ -3,6 +3,11 @@ package com.boy.spring.formework.context;
 import com.boy.spring.formework.annotation.BoyAutowired;
 import com.boy.spring.formework.annotation.BoyController;
 import com.boy.spring.formework.annotation.BoyService;
+import com.boy.spring.formework.aop.BoyAopConfig;
+import com.boy.spring.formework.aop.BoyAopProxy;
+import com.boy.spring.formework.aop.BoyCglibAopProxy;
+import com.boy.spring.formework.aop.BoyJdkDynamicAopProxy;
+import com.boy.spring.formework.aop.support.BoyAdvisedSupport;
 import com.boy.spring.formework.beans.BoyBeanWrapper;
 import com.boy.spring.formework.beans.config.BoyBeanDefinition;
 import com.boy.spring.formework.beans.config.BoyBeanPostProcessor;
@@ -100,23 +105,23 @@ public class BoyApplicationContext extends BoyDefaultListableBeanFactory impleme
 
     private void populateBean(String beanName, Object instance) {
         Class<?> clazz = instance.getClass();
-        if (!(clazz.isAnnotationPresent(BoyController.class) || clazz.isAnnotationPresent(BoyService.class))){
+        if (!(clazz.isAnnotationPresent(BoyController.class) || clazz.isAnnotationPresent(BoyService.class))) {
             return;
         }
         Field[] fields = clazz.getDeclaredFields();
         for (Field field : fields) {
-            if (!field.isAnnotationPresent(BoyAutowired.class)){
+            if (!field.isAnnotationPresent(BoyAutowired.class)) {
                 continue;
             }
-            BoyAutowired autowired  = field.getAnnotation(BoyAutowired.class);
+            BoyAutowired autowired = field.getAnnotation(BoyAutowired.class);
             String autowiredBeanName = autowired.value().trim();
-            if ("".equals(autowiredBeanName)){
+            if ("".equals(autowiredBeanName)) {
                 autowiredBeanName = field.getType().getName();
             }
             field.setAccessible(true);
             try {
-                    field.set(instance,this.factoryBeanInstanceCache.get(autowiredBeanName).getWrappedClass());
-            }catch (Exception e){
+                field.set(instance, this.factoryBeanInstanceCache.get(autowiredBeanName).getWrappedClass());
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -127,18 +132,44 @@ public class BoyApplicationContext extends BoyDefaultListableBeanFactory impleme
         Object instance = null;
         String className = beanDefinition.getBeanClassName();
         try {
-            if (this.factoryBeanObjectCache.containsKey(className)){
+            //  因为根据Class才能确定一个类是否有实例
+            if (this.factoryBeanObjectCache.containsKey(className)) {
                 instance = this.factoryBeanObjectCache.get(className);
-            }else {
+            } else {
                 Class<?> clazz = Class.forName(className);
                 instance = clazz.newInstance();
-                this.factoryBeanObjectCache.put(beanDefinition.getFactoryBeanName(),instance);
+                BoyAdvisedSupport config = instantionAopConfig(beanDefinition);
+                config.setTargetClass(clazz);
+                config.setTarget(instance);
+                if (config.pointCutMatch()) {
+                    instance = createProxy(config).getProxy();
+                }
+                this.factoryBeanObjectCache.put(beanDefinition.getFactoryBeanName(), instance);
             }
             return instance;
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private BoyAopProxy createProxy(BoyAdvisedSupport config) {
+        Class<?> targetClass = config.getTargetClass();
+        if (targetClass.getInterfaces().length > 0) {
+            return new BoyJdkDynamicAopProxy(config);
+        }
+        return new BoyCglibAopProxy(config);
+    }
+
+    private BoyAdvisedSupport instantionAopConfig(BoyBeanDefinition beanDefinition) throws Exception {
+        BoyAopConfig config = new BoyAopConfig();
+        config.setPointCut(reader.getConfig().getProperty("pointCut"));
+        config.setAspectClass(reader.getConfig().getProperty("aspectClass"));
+        config.setAspectBefore(reader.getConfig().getProperty("aspectBefore"));
+        config.setAspectAfter(reader.getConfig().getProperty("aspectAfter"));
+        config.setAspectAfterThrow(reader.getConfig().getProperty("aspectAfterThrow"));
+        config.setAspectAfterThrowingName(reader.getConfig().getProperty("aspectAfterThrowingName"));
+        return new BoyAdvisedSupport(config);
     }
 
     public Object getBean(Class<?> beanClass) throws Exception {
